@@ -1,0 +1,29 @@
+# Environments
+.venv/
+venv/
+ENV/
+env/
+
+# Python cache
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.pytest_cache/
+
+# Local data landing zones
+data/raw/*
+!data/raw/.gitkeep
+data/dlq/
+data/bronze/
+*.jsonl
+*.parquet
+
+# IDE & OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+AGENTS.md
+
