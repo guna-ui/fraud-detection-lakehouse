@@ -1,6 +1,6 @@
 import random
 import uuid
-from datetime import datetime,timezone
+from datetime import datetime,timezone,timedelta
 from faker import Faker
 
 
@@ -19,28 +19,61 @@ merchant=['merchant_1', 'merchant_2', 'merchant_3', 'merchant_4', 'merchant_5', 
 
 fake=Faker()
 
-def transactionStream():
+def rapid_velocity(userid,timestamp):
+    for i in range(0,4):
+        event_time=timestamp+timedelta(seconds=i*5)
+        yield  build_transaction(user_id=userid,event_time=event_time.isoformat())
+
+def travel_fraud(userid,timestamp,country_code=None):
+    country_code1,country_code2=random.sample(population=['IN', 'US', 'GB', 'AU'],k=2)
+    country_code=[country_code1,country_code2]
+    for i in range(0,2):
+            event_time=timestamp+timedelta(minutes=i*2)
+            yield  build_transaction(user_id=userid,event_time=event_time.isoformat(),country_code=country_code[i])
+def multi_currency(userid,timestamp,currency=None):
+    currency=random.sample(population=['INR', 'USD', 'EUR', 'GBP'],k=3)
     
-    # print(location)
+    for i in range(0,3):
+        amount=round(random.uniform(8000.0,9999.99),2)
+        event_time=timestamp+timedelta(seconds=i*30)
+        yield  build_transaction(user_id=userid,event_time=event_time.isoformat(),currency_code=currency[i],amount=amount)
+def transactionStream():
     while True:
-        location=fake.local_latlng(country_code='IN', coords_only=False)
-        current_time=datetime.now(timezone.utc)
-        yield {
+      record=random.choices(['normal', 'velocity', 'travel', 'currency'], weights=[94, 2, 2, 2], k=1)[0]
+      userid=random.choice(USERS)
+      timestamp=datetime.now(timezone.utc)
+      if record=='normal':
+        yield build_transaction()
+      if record=='velocity':
+        yield from rapid_velocity(userid=userid,timestamp=timestamp)
+      if record=='travel':
+        yield from travel_fraud(userid=userid,timestamp=timestamp)
+      if record=='currency':
+        yield from multi_currency(userid=userid,timestamp=timestamp)
+    # #   country_code1,country_code2=random.sample(population=['IN', 'US', 'GB', 'AU'],k=2)
+    # #   yield from rapid_velocity(userid=userid,timestamp=timestamp)
+    # #   yield from travel_fraud(userid=userid,timestamp=timestamp)
+    #   yield from multi_currency(userid=userid,timestamp=timestamp)
+
+def build_transaction(user_id=None,event_time=None,country_code='IN',currency_code=None,amount=None):
+     location=fake.local_latlng(country_code=country_code, coords_only=False)
+
+     return {
         "transaction_id": str(uuid.uuid4()),
-        "user_id": random.choice(USERS),
-        "event_timestamp": current_time.isoformat(),
+        "user_id": user_id or random.choice(USERS),
+        "event_timestamp": event_time or datetime.now(timezone.utc).isoformat(),
         "merchant": {
             "merchant_id": random.choice(merchant),
             "category": random.choice(category),
             "city": location[2],
-            "country": location[3]
+            "country": location[3] 
         },
         "device": {
             "ip_address": fake.ipv4(),
             "device_id": str(uuid.uuid4())
         },
-        "amount": round(random.uniform(1000,10000),2),
-        "currency": random.choice(currency),
+        "amount": amount or round(random.uniform(1000,10000),2),
+        "currency":currency_code or  random.choice(currency),
         "location": {
             "latitude": float(location[0]),
             "longitude": float(location[1])
@@ -49,9 +82,9 @@ def transactionStream():
         "action": "purchase"
     }
 
-
 if __name__ == "__main__":
-    
+       
     stream=transactionStream()
-    for _ in range(3):
-        print(next(stream))
+    for _ in range(4):
+       print(next(stream))
+        
