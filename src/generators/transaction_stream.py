@@ -1,8 +1,10 @@
+import pathlib
+import json
 import random
 import uuid
 from datetime import datetime,timezone,timedelta
 from faker import Faker
-
+from pathlib import Path
 
 USERS=['user_1', 'user_2', 'user_3', 'user_4', 'user_5', 'user_6', 'user_7', 'user_8', 'user_9', 'user_10', 'user_11', 'user_12', 'user_13', 'user_14', 'user_15', 'user_16', 'user_17', 'user_18', 'user_19', 'user_20', 'user_21', 'user_22', 'user_23', 'user_24', 'user_25', 'user_26', 'user_27', 'user_28', 'user_29', 'user_30', 'user_31', 'user_32', 'user_33', 'user_34', 'user_35', 'user_36', 'user_37', 'user_38', 'user_39', 'user_40', 'user_41', 'user_42', 'user_43', 'user_44', 'user_45', 'user_46', 'user_47', 'user_48', 'user_49', 'user_50']
 category = [
@@ -24,12 +26,15 @@ def rapid_velocity(userid,timestamp):
         event_time=timestamp+timedelta(seconds=i*5)
         yield  build_transaction(user_id=userid,event_time=event_time.isoformat())
 
+
 def travel_fraud(userid,timestamp,country_code=None):
     country_code1,country_code2=random.sample(population=['IN', 'US', 'GB', 'AU'],k=2)
     country_code=[country_code1,country_code2]
     for i in range(0,2):
             event_time=timestamp+timedelta(minutes=i*2)
             yield  build_transaction(user_id=userid,event_time=event_time.isoformat(),country_code=country_code[i])
+
+
 def multi_currency(userid,timestamp,currency=None):
     currency=random.sample(population=['INR', 'USD', 'EUR', 'GBP'],k=3)
     
@@ -37,9 +42,11 @@ def multi_currency(userid,timestamp,currency=None):
         amount=round(random.uniform(8000.0,9999.99),2)
         event_time=timestamp+timedelta(seconds=i*30)
         yield  build_transaction(user_id=userid,event_time=event_time.isoformat(),currency_code=currency[i],amount=amount)
+
+
 def transactionStream():
     while True:
-      record=random.choices(['normal', 'velocity', 'travel', 'currency'], weights=[94, 2, 2, 2], k=1)[0]
+      record=random.choices(['normal', 'velocity', 'travel', 'currency','corrupt'], weights=[80, 1, 1, 1,17], k=1)[0]
       userid=random.choice(USERS)
       timestamp=datetime.now(timezone.utc)
       if record=='normal':
@@ -50,10 +57,9 @@ def transactionStream():
         yield from travel_fraud(userid=userid,timestamp=timestamp)
       if record=='currency':
         yield from multi_currency(userid=userid,timestamp=timestamp)
-    # #   country_code1,country_code2=random.sample(population=['IN', 'US', 'GB', 'AU'],k=2)
-    # #   yield from rapid_velocity(userid=userid,timestamp=timestamp)
-    # #   yield from travel_fraud(userid=userid,timestamp=timestamp)
-    #   yield from multi_currency(userid=userid,timestamp=timestamp)
+      if record=='corrupt':
+        yield  corrupted_transaction(user_id=None,event_time=timestamp)
+
 
 def build_transaction(user_id=None,event_time=None,country_code='IN',currency_code=None,amount=None):
      location=fake.local_latlng(country_code=country_code, coords_only=False)
@@ -72,7 +78,7 @@ def build_transaction(user_id=None,event_time=None,country_code='IN',currency_co
             "ip_address": fake.ipv4(),
             "device_id": str(uuid.uuid4())
         },
-        "amount": amount or round(random.uniform(1000,10000),2),
+        "amount":  amount or round(random.uniform(1000,10000),2),
         "currency":currency_code or  random.choice(currency),
         "location": {
             "latitude": float(location[0]),
@@ -82,9 +88,43 @@ def build_transaction(user_id=None,event_time=None,country_code='IN',currency_co
         "action": "purchase"
     }
 
+def corrupted_transaction(user_id=None,event_time=None,country_code='IN',currency_code=None,amount=None):
+     location=fake.local_latlng(country_code=country_code, coords_only=False)
+
+     return {
+        "transaction_id": str(uuid.uuid4()),
+        "user_id": None,
+        "event_timestamp": "INVALID_TIMESTAMP",
+        "merchant": {
+            "merchant_id": random.choice(merchant),
+            "category": random.choice(category),
+            "city": location[2],
+            "country": location[3] 
+        },
+        "device": {
+            "ip_address": fake.ipv4(),
+            "device_id": str(uuid.uuid4())
+        },
+        "amount": -round(random.uniform(1000,10000),2),
+        "currency":currency_code or  random.choice(currency),
+        "location": {
+            "latitude": float(location[0]),
+            "longitude": float(location[1])
+        },
+        "channel": "pos_chip",
+        "action": "purchase"
+    }
+
+
 if __name__ == "__main__":
        
     stream=transactionStream()
-    for _ in range(4):
-       print(next(stream))
-        
+    output_dir = pathlib.Path(r"D:\fraud-detection-pipeline\data\raw") 
+    output_dir.parent.mkdir(parents=True,exist_ok=True)
+    file_path=output_dir/'transactions.jsonl'
+    with open(file=file_path,mode='a',encoding='utf-8') as f:
+       print(f"Saving the records to {file_path}")
+       for _ in range(100):
+         f.write(json.dumps(next(stream))+'\n')
+       
+
